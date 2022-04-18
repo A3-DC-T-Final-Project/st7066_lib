@@ -1,1 +1,1 @@
-./lib/ST7066U/README.md
+lib/ST7066U/README.md
