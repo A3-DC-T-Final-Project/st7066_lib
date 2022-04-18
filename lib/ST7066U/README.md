@@ -6,38 +6,38 @@ Tested on the [STM32F407 Discovery board](https://www.st.com/en/evaluation-tools
 # Usage
 ## Initialisation
 Construct an ST7066U object:
-```C++
+```cpp
 ST7066U st7066u(PB_0, PB_1, PB_2, PA_15, PD_0, PD_1, PD_2, PD_3, PD_4, PD_5,
                     PD_6, PD_7, false, true);
 ```
 Then use the object to perform any of the below actions.
 
 ## Checking everything works and is wired up correctly
-```C++
+```cpp
 st7066u.helloWorld();
 ```
 
 ## Clear the display
-```C++
+```cpp
 st7066u.clear();
 ```
 
 ## Move to the first line
-```C++
+```cpp
 st7066u.firstLine();
 ```
 
 ## Move to the second line
-```C++
+```cpp
 st7066u.secondLine();
 ```
 
 ## Printing a string
-```C++
+```cpp
 st7066u.printString("A constant string");
 ```
 Or
-```C++
+```cpp
 std::string message = "A variable string";
 st7066u.printString(message);
 ```
