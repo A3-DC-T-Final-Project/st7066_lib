@@ -2,9 +2,9 @@
 
 #include "mbed.h"
 
-ST7066U::ST7066U(PinName rs, PinName rw, PinName e, PinName oe, PinName d0, PinName d1,
-                 PinName d2, PinName d3, PinName d4, PinName d5, PinName d6,
-                 PinName d7, Serial * serial)
+ST7066U::ST7066U(PinName rs, PinName rw, PinName e, PinName oe, PinName d0,
+                 PinName d1, PinName d2, PinName d3, PinName d4, PinName d5,
+                 PinName d6, PinName d7, bool cursorOn, bool cursorBlink)
     : _rs(rs),
       _rw(rw),
       _e(e),
@@ -16,26 +16,27 @@ ST7066U::ST7066U(PinName rs, PinName rw, PinName e, PinName oe, PinName d0, PinN
       _d4(d4),
       _d5(d5),
       _d6(d6),
-      _d7(d7) {
-
-    // Default all pins to ground
-    _rs = 0;
-    _rw = 0;
-    _e = 0;
-    _d0 = 0;
-    _d1 = 0;
-    _d2 = 0;
-    _d3 = 0;
-    _d4 = 0;
-    _d5 = 0;
-    _d6 = 0;
-    _d7 = 0;
-
+      _d7(d7),
+      _cursorsOn{cursorOn},
+      _cursorBlink{cursorBlink} {
     // Enable LCD output
-    _oe = 1;
+    _oe.write(1);
 
-    // Store pointers to pins
-    pins = (DigitalInOut **) malloc(DATA_PINS * sizeof(DigitalInOut *));
+    // Default all pins to ground but read !write
+    _rs.write(0);
+    _rw.write(1);
+    _e.write(0);
+    _d0.write(0);
+    _d1.write(0);
+    _d2.write(0);
+    _d3.write(0);
+    _d4.write(0);
+    _d5.write(0);
+    _d6.write(0);
+    _d7.write(0);
+
+    // Store pointers to data pins
+    pins = (DigitalOut **)malloc(DATA_PINS * sizeof(DigitalInOut *));
     pins[0] = &(_d0);
     pins[1] = &(_d1);
     pins[2] = &(_d2);
@@ -45,63 +46,114 @@ ST7066U::ST7066U(PinName rs, PinName rw, PinName e, PinName oe, PinName d0, PinN
     pins[6] = &(_d6);
     pins[7] = &(_d7);
 
-    _serial = serial;
-
-    // Allocate memory for data array
-    data = (int *) malloc(DATA_PINS * sizeof(int));
+    thread_sleep_for(100);  // 100 ms
 
     reset();
-    test();
+
+    thread_sleep_for(100);  // 100 ms
 }
 
-void ST7066U::write(int * data) {
+void ST7066U::write(bool instruction) {
     int i;
     // Enable write mode (write is active low)
-    _rw = 0;
-    // Select instruction register
-    _rs = 0;
-    // Start enable signal (pw 140ns)
-    _e = 1;
-    wait_ns(100);
-
+    _rw.write(0);
+    // Select instruction register based on argument
+    _rs.write(!instruction);
     // Load data to write on pin
-    for(i = 0; i < DATA_PINS; i++) {
+    for (i = 0; i < DATA_PINS; i++) {
         pins[i]->write(data[i]);
     }
+    // Start enable signal
+    _e.write(1);
+    wait_us(OPERATION_TIME_US);
+    // Bring enable low
+    _e.write(0);
+    wait_us(OPERATION_TIME_US);
+}
 
-    // Hold data (pw 40 ns)
-    wait_ns(40);
+void ST7066U::resetData() {
+    int i;
+    for (i = 0; i < DATA_PINS; i++) {
+        data[i] = 0;
+    }
+}
 
-    // Emable signal goes low
-    _e = 0;
+void ST7066U::clear() {
+    resetData();
+    data[0] = 1;
+    write(true);
 
-    // Hold data for 10 ns
-    wait_ns(10);
-
-    wait_us(2000);
+    // Clear takes 1.52 ms to execute
+    thread_sleep_for(2);  // 2 ms
 }
 
 void ST7066U::reset() {
-    data[0] = 1;
+    // Set 8 bit mode
+    resetData();
+    data[3] = 1;
+    data[4] = 1;
+    data[5] = 1;
+    write(true);
+    write(true);  // Same instrcution twice as per datasheet
 
-    int i;
-    for(i = 1; i < DATA_PINS; i++) {
-        data[i] = 0;
-    }
+    // Set display on
+    resetData();
+    data[0] = _cursorBlink;
+    data[1] = _cursorsOn;
+    data[2] = 1;
+    data[3] = 1;
+    write(true);
 
-    write(data);
-    _serial->printf("reset done\n");
+    // Clear
+    clear();
+
+    // Entry mode set
+    resetData();
+    data[1] = 1;
+    data[2] = 1;
+    write(true);
 }
 
-void ST7066U::test() {
+void ST7066U::printString(std::string message) {
+    size_t message_sz = message.size();
+
+    // Write characters
     int i;
-    for(i = 0; i < DATA_PINS; i++) {
-        data[i] = 0;
+    for (i = 0; i < message_sz; i++) {
+        resetData();
+        // Get bit values from char
+        int j;
+        for (j = 0; j < DATA_PINS; j++) {
+            // Get charachter at index
+            unsigned char c = message.at(i);
+            // Get values of the 8 bits that make up the char
+            // In ~most~ systems, a u char is 8 bits.
+            data[j] = c & (1 << j);
+        }
+        // Write data
+        write(false);
     }
+}
 
-    data[3] = 1;
-    data[2] = 1;
+void ST7066U::firstLine() {
+    // Set Display RAM (DDRAM) Address to 00H
+    resetData();
+    data[7] = 1;
+    write(true);
+}
 
-    write(data);
-    _serial->printf("test done\n");
+void ST7066U::secondLine() {
+    // Set Display RAM (DDRAM) Address to 40H
+    resetData();
+    data[7] = 1;
+    data[6] = 1;
+    write(true);
+}
+
+void ST7066U::helloWorld() {
+    std::string hello = "Hello World!!";
+
+    clear();
+
+    printString(hello);
 }
