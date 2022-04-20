@@ -18,10 +18,11 @@ class ST7066U {
     void helloWorld();
 
    private:
-    DigitalOut _rs, _rw, _e, _oe, _d0, _d1, _d2, _d3, _d4, _d5, _d6, _d7;
-    DigitalOut** pins;
+    DigitalInOut _rs, _rw, _e, _oe, _d0, _d1, _d2, _d3, _d4, _d5, _d6, _d7;
+    DigitalInOut** pins;
     bool _cursorsOn, _cursorBlink;
     int data[DATA_PINS];
+    bool isBusy();
     void resetData();
     void write(bool instruction);
     void reset();

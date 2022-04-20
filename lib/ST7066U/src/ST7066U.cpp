@@ -19,6 +19,21 @@ ST7066U::ST7066U(PinName rs, PinName rw, PinName e, PinName oe, PinName d0,
       _d7(d7),
       _cursorsOn{cursorOn},
       _cursorBlink{cursorBlink} {
+
+    // Set all pins as outputs
+    _rs.output();
+    _rw.output();
+    _e.output();
+    _oe.output();
+    _d0.output();
+    _d1.output();
+    _d2.output();
+    _d3.output();
+    _d4.output();
+    _d5.output();
+    _d6.output();
+    _d7.output();
+
     // Enable LCD output
     _oe.write(1);
 
@@ -36,7 +51,7 @@ ST7066U::ST7066U(PinName rs, PinName rw, PinName e, PinName oe, PinName d0,
     _d7.write(0);
 
     // Store pointers to data pins
-    pins = (DigitalOut **)malloc(DATA_PINS * sizeof(DigitalInOut *));
+    pins = (DigitalInOut **)malloc(DATA_PINS * sizeof(DigitalInOut *));
     pins[0] = &(_d0);
     pins[1] = &(_d1);
     pins[2] = &(_d2);
@@ -53,6 +68,39 @@ ST7066U::ST7066U(PinName rs, PinName rw, PinName e, PinName oe, PinName d0,
     thread_sleep_for(100);  // 100 ms
 }
 
+bool ST7066U::isBusy() {
+    // Set pins as inputs
+    int i;
+    for(i = 0; i < DATA_PINS; i++) {
+        pins[i]->input();
+    }
+
+    // Set instruction register
+    _rw.write(0);
+
+    // Enable read mode (write is active low)
+    _rw.write(1);
+
+    // Start enable signal
+    _e.write(1);
+    wait_us(OPERATION_TIME_US);
+
+    // Read busy flag
+    bool result = _d7.read();
+
+    // Bring enable low
+    _e.write(0);
+    wait_us(OPERATION_TIME_US);
+
+    // Reset pins as output
+    for(i = 0; i < DATA_PINS; i++) {
+        pins[i]->output();
+    }
+
+    // Return busy status
+    return result;
+}
+
 void ST7066U::write(bool instruction) {
     int i;
     // Enable write mode (write is active low)
@@ -63,6 +111,7 @@ void ST7066U::write(bool instruction) {
     for (i = 0; i < DATA_PINS; i++) {
         pins[i]->write(data[i]);
     }
+
     // Start enable signal
     _e.write(1);
     wait_us(OPERATION_TIME_US);
@@ -85,6 +134,8 @@ void ST7066U::clear() {
 
     // Clear takes 1.52 ms to execute
     thread_sleep_for(2);  // 2 ms
+
+    while(isBusy()) {} // Do nothing until busy
 }
 
 void ST7066U::reset() {
@@ -118,7 +169,7 @@ void ST7066U::printString(std::string message) {
     size_t message_sz = message.size();
 
     // Write characters
-    int i;
+    unsigned int i;
     for (i = 0; i < message_sz; i++) {
         resetData();
         // Get bit values from char
