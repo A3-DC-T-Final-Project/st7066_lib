@@ -18,12 +18,7 @@ int main() {
     };
     
     uint8_t smileyAddr = st7066u.storeCustomChar(st7066u.smiley);
-    st7066u.helloWorld();
-    uint8_t testAddr = st7066u.storeCustomChar(test);
-    st7066u.writeCustomChar(smileyAddr);
-    st7066u.writeCustomChar(testAddr);
-    thread_sleep_for(2000); // 2 seconds
-    
+    uint8_t testAddr = st7066u.storeCustomChar(test);    
 
     while(true) {
         st7066u.clear();
@@ -35,10 +30,12 @@ int main() {
         st7066u.clearFirstLine();
         thread_sleep_for(200); // 200 ms
         st7066u.printString("First line");
+        st7066u.writeCustomChar(smileyAddr);
         thread_sleep_for(200); // 200 ms
         st7066u.clearSecondLine();
         thread_sleep_for(200); // 200 ms
         st7066u.printString("Second line");
+        st7066u.writeCustomChar(testAddr);
         thread_sleep_for(200); // 200 ms
     }
 

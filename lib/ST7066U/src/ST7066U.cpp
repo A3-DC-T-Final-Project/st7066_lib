@@ -79,7 +79,7 @@ bool ST7066U::isBusy() {
     }
 
     // Set instruction register
-    _rw.write(0);
+    _rs.write(0);
 
     // Enable read mode (write is active low)
     _rw.write(1);
@@ -105,6 +105,8 @@ bool ST7066U::isBusy() {
 }
 
 void ST7066U::write(bool instruction) {
+    while(isBusy()) {} // Do nothing until not busy
+
     int i;
     // Enable write mode (write is active low)
     _rw.write(0);
@@ -137,8 +139,6 @@ void ST7066U::clear() {
 
     // Clear takes 1.52 ms to execute
     thread_sleep_for(2);  // 2 ms
-
-    while(isBusy()) {} // Do nothing until busy
 }
 
 void ST7066U::reset() {
@@ -275,7 +275,7 @@ uint8_t ST7066U::getCurrentAddress() {
     }
 
     // Set instruction register
-    _rw.write(0);
+    _rs.write(0);
 
     // Enable read mode (write is active low)
     _rw.write(1);
@@ -284,11 +284,10 @@ uint8_t ST7066U::getCurrentAddress() {
     _e.write(1);
     wait_us(OPERATION_TIME_US);
 
-    // Read address -- this needs fixing
+    // Read address
     uint8_t address = 0;
-    for(i = (DATA_PINS - 1); i > -1; i--) {
-        address = pins[i]->read();
-        address <<= 1;
+    for(i = 0; i < DATA_PINS; i++) {
+        address |= (pins[i]->read() << i);
     }
 
     // Bring enable low
