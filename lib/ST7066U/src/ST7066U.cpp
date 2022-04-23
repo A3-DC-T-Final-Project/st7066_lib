@@ -71,7 +71,7 @@ ST7066U::ST7066U(PinName rs, PinName rw, PinName e, PinName oe, PinName d0,
     customCounter = 0;
 }
 
-bool ST7066U::isBusy() {
+void ST7066U::read(bool * busy, uint8_t * address) {
     // Set pins as inputs
     int i;
     for(i = 0; i < DATA_PINS; i++) {
@@ -89,7 +89,16 @@ bool ST7066U::isBusy() {
     wait_us(OPERATION_TIME_US);
 
     // Read busy flag
-    bool result = _d7.read();
+    if (busy != NULL)
+        (*busy) = _d7.read();
+
+    // Read address
+    if (address != NULL) {
+        (*address) = 0;
+        for(i = 0; i < (DATA_PINS - 1); i++) {
+            (*address) |= (pins[i]->read() << i);
+        }
+    }
 
     // Bring enable low
     _e.write(0);
@@ -99,13 +108,11 @@ bool ST7066U::isBusy() {
     for(i = 0; i < DATA_PINS; i++) {
         pins[i]->output();
     }
-
-    // Return busy status
-    return result;
 }
 
 void ST7066U::write(bool instruction) {
-    while(isBusy()) {} // Do nothing until not busy
+    bool busy = true;
+    while(busy) {read(&busy, NULL);} // Do nothing until not busy
 
     int i;
     // Enable write mode (write is active low)
@@ -267,42 +274,6 @@ void ST7066U::setCGRAMAddress(uint8_t address) {
     write(true);
 }
 
-uint8_t ST7066U::getCurrentAddress() {
-    // Set pins as inputs
-    int i;
-    for(i = 0; i < DATA_PINS; i++) {
-        pins[i]->input();
-    }
-
-    // Set instruction register
-    _rs.write(0);
-
-    // Enable read mode (write is active low)
-    _rw.write(1);
-
-    // Start enable signal
-    _e.write(1);
-    wait_us(OPERATION_TIME_US);
-
-    // Read address
-    uint8_t address = 0;
-    for(i = 0; i < DATA_PINS; i++) {
-        address |= (pins[i]->read() << i);
-    }
-
-    // Bring enable low
-    _e.write(0);
-    wait_us(OPERATION_TIME_US);
-
-    // Reset pins as output
-    for(i = 0; i < DATA_PINS; i++) {
-        pins[i]->output();
-    }
-
-    // Return busy status
-    return address;
-}
-
 void ST7066U::setDDRAMAddress(uint8_t address) {
     // Set DDRAM to Address [address]
     resetData();
@@ -316,7 +287,8 @@ void ST7066U::setDDRAMAddress(uint8_t address) {
 
 uint8_t ST7066U::storeCustomChar(uint8_t custom[8][5]) {
     // Get current DDRAM Address
-    uint8_t prevAddress = getCurrentAddress();
+    uint8_t prevAddress = 0;
+    read(NULL, &prevAddress);
 
     /* CGRAM Address starts at 40H. In 5x8 mode,
      * each character takes 8 addresses in RAM.
@@ -346,12 +318,15 @@ uint8_t ST7066U::storeCustomChar(uint8_t custom[8][5]) {
     // Increment custom counter
     customCounter++;
 
+    // Return address where custom char is saved. In 5x8 mode,
+    // address can be 0 to 7.
     return prevCustomCounter;
 }
 
 void ST7066U::writeCustomChar(uint8_t custom) {
     resetData();
     uint8_t i;
+    // Write custom character stored at address [custom]
     for(i = 0; i < DATA_PINS; i++) {
         data[i] = (custom >> i) & 1;
     }

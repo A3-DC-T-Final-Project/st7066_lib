@@ -37,13 +37,12 @@ class ST7066U {
     bool _cursorsOn, _cursorBlink;
     uint8_t customCounter;
     uint8_t data[DATA_PINS];
-    bool isBusy();
     void resetData();
     void write(bool instruction);
+    void read(bool * busy, uint8_t * address);
     void reset();
     void clearLine(uint8_t address, uint8_t lastAddress);
     void setCGRAMAddress(uint8_t address);
-    uint8_t getCurrentAddress();
     void setDDRAMAddress(uint8_t address);
 };
 
